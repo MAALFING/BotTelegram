@@ -35,10 +35,13 @@ import org.xml.sax.SAXException;
  */
 public class GetUpdates extends Thread {
 
+    Utenti vett = new Utenti();
+
     static String token = "5219732936:AAGmokA5wCDerqPAOWTNVAdpfHgXd6i5W4o";
     int lastID = -1;
     String xml = "";
     JSONObject json = null;
+    Document document;
 
     @Override
     public void run() {
@@ -48,28 +51,24 @@ public class GetUpdates extends Thread {
                 String text = json.getJSONArray("result").getJSONObject(json.getJSONArray("result").length() - 1).getJSONObject("message").getString("text");
                 if (lastID != json.getJSONArray("result").getJSONObject(json.getJSONArray("result").length() - 1).getJSONObject("message").getInt("message_id")) {
                     lastID = json.getJSONArray("result").getJSONObject(json.getJSONArray("result").length() - 1).getJSONObject("message").getInt("message_id");
+                    int id = json.getJSONArray("result").getJSONObject(json.getJSONArray("result").length() - 1).getJSONObject("message").getJSONObject("from").getInt("id");
+                    System.out.println(id);
                     if (text.contains("/citta")) {
                         System.out.println("Sì");
                         text = text.substring(7, text.length());
-                        
-                        
-                        
-                        
-                        
-                        
-
-                        //https://nominatim.openstreetmap.org/search?q=cesano+maderno&format=xml&addressdetails=1
+                        String nome = json.getJSONArray("result").getJSONObject(json.getJSONArray("result").length() - 1).getJSONObject("message").getJSONObject("from").getString("first_name");
+                        System.out.println(nome);
                         BufferedReader in = null;
-                        PrintWriter out;
-                        
+                        //PrintWriter out;
+
                         try {
                             //out = new PrintWriter("xml/valute.xml");
 
                             URL url;
                             // System.setProperty("java.protocol.handler.pkgs", "com.sun.net.ssl.internal.www.protocol");
                             // url =  new URL("https://www.agenziaentrate.gov.it/portale/documents/20143/296358/Provvedimento+30+marzo+2017+Distributori+automatici_Allegato+Api+REST+Dispositivi+%28v.3.0%29.pdf/7cfe447f-5823-5873-e55d-d3fa825877fd");
-                            url = new URL("https://nominatim.openstreetmap.org/search?q="+text+"&format=xml&addressdetails=1");
-                            
+                            url = new URL("https://nominatim.openstreetmap.org/search?q=" + text + "&format=xml&addressdetails=1");
+
                             in = new BufferedReader(new InputStreamReader(url.openStream()));
                             String line;
                             while ((line = in.readLine()) != null) {
@@ -82,24 +81,33 @@ public class GetUpdates extends Thread {
                             //out.close();
 
                         } catch (IOException ex) {
-                            Logger.getLogger(GetUpdates.class.getName()).log(Level.SEVERE, null, ex);;
+                            Logger.getLogger(GetUpdates.class.getName()).log(Level.SEVERE, null, ex);
                         }
 
                         System.out.println(text);
+                        String[] result = new String[2];
+                        try {
+                            result = parseDocument(xml, id).split(";");
+                            xml = "";
+
+                        } catch (ParserConfigurationException ex) {
+                            Logger.getLogger(GetUpdates.class.getName()).log(Level.SEVERE, null, ex);
+
+                        } catch (SAXException ex) {
+                            Logger.getLogger(GetUpdates.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (NullPointerException ex) {
+                            System.out.println("Nessun risultato trovato");
+                        }
+                        if (!vett.AU(new Utente(nome, id, text))) {
+                            System.out.println("Utente già esistente");
+                            JsonReader.readJsonFromUrl("https://api.telegram.org/bot" + token + "/sendMessage?chat_id=" + id + "&text=" + "Posizione aggiornata a:%0ALATITUDINE " + result[0] + "%0ALONGITUDINE " + result[1]);
+                        } else {
+                            JsonReader.readJsonFromUrl("https://api.telegram.org/bot" + token + "/sendMessage?chat_id=" + id + "&text=" + "Utente creato a:%0ALATITUDINE " + result[0] + "%0ALONGITUDINE " + result[1]);
+                        }
+
                     }
-                    
-                    
-                    
-                    
-                    try {
-                        parseDocument(xml);
-                        xml="";
-                    } catch (ParserConfigurationException ex) {
-                        Logger.getLogger(GetUpdates.class.getName()).log(Level.SEVERE, null, ex);
-                    } catch (SAXException ex) {
-                        Logger.getLogger(GetUpdates.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                    
+
+                    //https://nominatim.openstreetmap.org/search?q=cesano+maderno&format=xml&addressdetails=1
                     getJSON();
                 }
                 //getJSON();
@@ -122,13 +130,10 @@ public class GetUpdates extends Thread {
         //System.out.println(json.getJSONArray("result").getJSONObject(json.getJSONArray("result").length()-1).getJSONObject("message").getInt("message_id"));
         return json.toString();
     }
-    
-    private Document document;
 
+    public String parseDocument(String filename, int id) throws ParserConfigurationException, SAXException, IOException {
 
-    public String parseDocument(String filename)  throws ParserConfigurationException, SAXException, IOException {
-        
-        String result="";        
+        String result = "";
         DocumentBuilderFactory factory;
         DocumentBuilder builder;
         Element root, element;
@@ -136,10 +141,7 @@ public class GetUpdates extends Thread {
         // creazione dell’albero DOM dal documento XML
         factory = DocumentBuilderFactory.newInstance();
         builder = factory.newDocumentBuilder();
-        
-        
-        
-        
+
         document = builder.parse(new InputSource(new StringReader(filename)));
         root = document.getDocumentElement();
         //List<Change> dati = new ArrayList();
@@ -149,15 +151,10 @@ public class GetUpdates extends Thread {
         Element place = (Element) element.getElementsByTagName("place").item(0);
         String lat = place.getAttribute("lat");
         String log = place.getAttribute("lon");
-        
-        result = "LATITUDINE " + lat+"\nLONGITUDINE "+log;
-        System.out.println("LATITUDINE " + lat+" LONGITUDINE "+log);
-        
-        
-        JsonReader.readJsonFromUrl("https://api.telegram.org/bot" + token + "/sendMessage?chat_id=844853114&text="+"LATITUDINE " + lat+"%0ALONGITUDINE "+log);
-        
-        
-        return result;
-        }
-        
+        result = "LATITUDINE " + lat + "\nLONGITUDINE " + log;
+        System.out.println("LATITUDINE " + lat + " LONGITUDINE " + log);
+
+        return lat + ";" + log;
     }
+
+}
